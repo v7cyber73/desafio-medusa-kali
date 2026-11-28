@@ -1,84 +1,163 @@
-# Desafio de Brute Force com Kali Linux e Medusa
+<h1 align="center">Kali Linux & Medusa</h1>
+<p align="center"><strong>Desafio prático de segurança ofensiva — DIO</strong></p>
+<p align="center">FTP · HTTP / DVWA · SMB / Samba</p>
 
-Projeto prático da DIO, realizado em laboratório isolado com Kali Linux e Metasploitable 2.
+---
 
-## Ambiente
+## Sobre o projeto
 
-- Kali Linux e Metasploitable em máquinas virtuais (VirtualBox)
-- Alvo de laboratório: `192.168.56.106`
-- Ferramentas: `ping`, `Nmap`, `Medusa`, `curl` e navegador com DevTools
-- Serviços analisados: FTP e HTTP (DVWA)
+Este repositório documenta minha experiência prática com auditoria de autenticação e análise de serviços em um laboratório virtual. O objetivo é identificar configurações inseguras, validar resultados e registrar evidências técnicas.
 
-## Fase 1 — FTP
+## Ambiente de laboratório
 
-Primeiro confirmei a comunicação entre as máquinas:
+| Componente | Configuração |
+| :--- | :--- |
+| Máquina de auditoria | Kali Linux |
+| Máquina de treinamento | Metasploitable 2 |
+| Virtualização | Oracle VirtualBox |
+| IP do laboratório | `192.168.56.106` |
+| Ferramentas | Nmap, Medusa, Enum4linux, SMBClient, curl e DevTools |
 
-```bash
-ping -c 4 192.168.56.106
-nmap -sV -p 21,80,139,445 192.168.56.106
-```
+## Resumo dos resultados
 
-O ping retornou **4 respostas e 0% de perda**. O Nmap identificou as portas `21` (FTP), `80` (HTTP), `139` e `445` (SMB) abertas.
+| Fase | Serviço | Resultado |
+| :--- | :--- | :--- |
+| 01 | FTP — porta 21 | Autenticação validada |
+| 02 | HTTP / DVWA — porta 80 | Login manual validado; automação inconclusiva |
+| 03 | SMB — portas 139 e 445 | Autenticação validada |
 
-Criei duas listas pequenas de usuários e senhas de laboratório e executei:
+## Fase 01 — FTP
 
-```bash
-medusa -h 192.168.56.106 -U users.txt -P pass.txt -M ftp -t 6
-```
+Reconhecimento do serviço FTP e validação da autenticação com uma credencial padrão do laboratório.
 
-**Resultado:** o Medusa informou `ACCOUNT FOUND [SUCCESS]` para `msfadmin / msfadmin` no FTP. O teste demonstrou uma credencial fraca no serviço de treinamento.
+**Resultado:** Autenticação confirmada pelo Medusa e conexão FTP registrada.
 
-![Reconhecimento com Nmap](images/fase1-ftp/03-nmap-servicos.jpg)
+<details>
+<summary>Visualizar evidências da fase 01</summary>
 
-![Resultado do Medusa no FTP](images/fase1-ftp/04-medusa-ftp-sucesso.jpg)
+### Teste de conectividade
 
-Outras capturas da primeira fase estão na pasta [`images/fase1-ftp`](images/fase1-ftp).
+<img src="images/fase1-ftp/01-ping-kali-metasploitable.jpg" alt="Teste de conectividade" width="760">
 
-## Fase 2 — Web / DVWA
+### IP do laboratório
 
-Acessei o DVWA em `http://192.168.56.106/dvwa/login.php` e inspecionei o formulário de login. Ele usa método POST e os campos `username` e `password`.
+<img src="images/fase1-ftp/02-ip-metasploitable.jpg" alt="IP do laboratório" width="760">
 
-![Página de login](images/fase2-dvwa/01-pagina-login.png)
+### Serviços identificados
 
-Fiz um teste com o Medusa no módulo `http`, mas ele mostrou `Invalid method: PAGE/FORM/FAIL` e diversos `SUCCESS` sem validação. **Esses resultados são falsos positivos e não comprovam descoberta de senhas.**
+<img src="images/fase1-ftp/03-nmap-servicos.jpg" alt="Serviços identificados" width="760">
 
-Depois testei o módulo `web-form`; ele parou com **HTTP 302**, que é um redirecionamento. O servidor apontava novamente para `login.php` em tentativas inválidas.
+### Resultado do teste FTP
 
-![Avisos do Medusa](images/fase2-dvwa/05-medusa-avisos.png)
+<img src="images/fase1-ftp/04-medusa-ftp-sucesso.jpg" alt="Resultado do teste FTP" width="760">
 
-![Análise da requisição Web](images/fase2-dvwa/04-formulario-requisicao.png)
+### Validação da conexão FTP
 
-Para confirmar o funcionamento da aplicação, testei o login padrão do laboratório com `curl`, mantendo a sessão por cookies:
+<img src="images/fase1-ftp/05-conexao-ftp.jpg" alt="Validação da conexão FTP" width="760">
 
-```bash
-curl -s -c /tmp/dvwa-cookies.txt \
-  http://192.168.56.106/dvwa/login.php -o /dev/null
+</details>
 
-curl -s -L -b /tmp/dvwa-cookies.txt -c /tmp/dvwa-cookies.txt \
-  -d "username=admin&password=password&Login=Login" \
-  -w "\nHTTP final: %{http_code}\nURL final: %{url_effective}\n" \
-  http://192.168.56.106/dvwa/login.php \
-  -o /tmp/dvwa-resposta.html
-```
+---
 
-**Resultado confirmado:** HTTP `200`, redirecionamento final para `/dvwa/index.php`, página **Welcome** e usuário **admin** autenticado. A interface indicou nível de segurança `high`.
+## Fase 02 — HTTP / DVWA
 
-![DVWA autenticado como admin](images/fase2-dvwa/08-login-confirmado.png)
+Inspeção do formulário de login, cookies e respostas HTTP.
 
-**Situação da fase 2:** login manual validado; teste automatizado de força bruta com Medusa ainda não validado.
+**Resultado:** Login manual confirmado. O teste automatizado com Medusa apresentou falsos positivos e não foi validado.
+
+<details>
+<summary>Visualizar evidências da fase 02</summary>
+
+### Página de login
+
+<img src="images/fase2-dvwa/01-pagina-login.png" alt="Página de login" width="760">
+
+### Inspeção de cookies
+
+<img src="images/fase2-dvwa/02-inspecao-cookies.png" alt="Inspeção de cookies" width="760">
+
+### Redirecionamento HTTP 302
+
+<img src="images/fase2-dvwa/03-redirecionamento-302.png" alt="Redirecionamento HTTP 302" width="760">
+
+### Inspeção do formulário
+
+<img src="images/fase2-dvwa/04-formulario-requisicao.png" alt="Inspeção do formulário" width="760">
+
+### Avisos da ferramenta
+
+<img src="images/fase2-dvwa/05-medusa-avisos.png" alt="Avisos da ferramenta" width="760">
+
+### Falsos positivos
+
+<img src="images/fase2-dvwa/06-medusa-falsos-positivos.png" alt="Falsos positivos" width="760">
+
+### Teste HTTP
+
+<img src="images/fase2-dvwa/07-medusa-teste-http.png" alt="Teste HTTP" width="760">
+
+### Login confirmado
+
+<img src="images/fase2-dvwa/08-login-confirmado.png" alt="Login confirmado" width="760">
+
+</details>
+
+---
+
+## Fase 03 — SMB / Samba
+
+Enumeração de contas, grupos e compartilhamentos com Enum4linux, seguida de auditoria de autenticação e validação pelo SMBClient.
+
+**Resultado:** Autenticação confirmada. Foram listados seis compartilhamentos; acesso root e permissões de escrita não foram comprovados.
+
+O servidor identificou o grupo `WORKGROUP` e os compartilhamentos `print$`, `tmp`, `opt`, `IPC$`, `ADMIN$` e `msfadmin`. Foi observada uma reconexão SMB1.
+
+<details>
+<summary>Visualizar evidências da fase 03</summary>
+
+### Enumeração SMB
+
+<img src="images/fase3-smb/01-enum4linux-comando.png" alt="Enumeração SMB" width="760">
+
+### Resultado da enumeração
+
+<img src="images/fase3-smb/02-enum4linux-resultado.png" alt="Resultado da enumeração" width="760">
+
+### Contas e grupos
+
+<img src="images/fase3-smb/03-enumeracao-contas.png" alt="Contas e grupos" width="760">
+
+### Referência da aula (outro IP)
+
+<img src="images/fase3-smb/04-referencia-aula.png" alt="Referência da aula (outro IP)" width="760">
+
+### Listas de treinamento
+
+<img src="images/fase3-smb/05-listas-laboratorio.png" alt="Listas de treinamento" width="760">
+
+### Resultado da auditoria SMB
+
+<img src="images/fase3-smb/06-medusa-resultado.png" alt="Resultado da auditoria SMB" width="760">
+
+### Validação com SMBClient
+
+<img src="images/fase3-smb/07-smbclient-validacao.png" alt="Validação com SMBClient" width="760">
+
+</details>
+
+---
 
 ## Aprendizados
 
-- Verificar conectividade e serviços antes dos testes.
-- Credenciais fracas são um risco em serviços expostos.
-- `302` representa redirecionamento e não sucesso de autenticação.
-- Mensagens `SUCCESS` de ferramentas precisam ser verificadas para evitar falsos positivos.
-- Cookies e sessões podem ser necessários para autenticação Web.
+- Identificar serviços e verificar a conectividade antes de realizar testes.
+- Confirmar resultados com ferramentas independentes.
+- Diferenciar redirecionamentos HTTP e falsos positivos de uma autenticação bem-sucedida.
+- Reconhecer os riscos de credenciais padrão, protocolos antigos e compartilhamentos expostos.
 
-## Recomendações
+## Recomendações de segurança
 
-Utilizar senhas fortes e únicas, MFA quando disponível, limitação de tentativas, monitoramento de login e atualização dos serviços. Manter aplicações deliberadamente vulneráveis apenas em laboratórios isolados.
+Substituir credenciais padrão, atualizar os serviços, desativar SMB1 quando possível, restringir compartilhamentos e sessões anônimas, limitar tentativas de login e monitorar eventos de autenticação.
 
-## Observação
+## Contexto educacional
 
-Testes realizados somente em máquinas virtuais de laboratório. As senhas citadas são credenciais padrão de treinamento. Nenhuma credencial real deve ser publicada.
+Projeto desenvolvido em máquinas virtuais de treinamento. As capturas documentam o laboratório; a referência da aula está identificada separadamente. Não publicar credenciais reais.
